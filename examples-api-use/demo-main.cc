@@ -1018,6 +1018,71 @@ private:
   citizen* parents_;
 };
 
+// Uncomment to use Double Buffering in the Plasma Visualization
+//#define PLASMA_DOUBLE_BUFFER 1
+
+// Based on sample code from RosettaCode.org (Java version)
+class Plasma : public ThreadedCanvasManipulator {
+public:
+#ifdef PLASMA_DOUBLE_BUFFER
+  Plasma(RGBMatrix *m) : ThreadedCanvasManipulator(m), matrix_(m) {
+    off_screen_canvas_ = m->CreateFrameCanvas();
+#else
+  Plasma(Canvas *m, int delay_ms=50) : ThreadedCanvasManipulator(m), delay_ms_(delay_ms) {
+#endif
+    hueShift = 0.0;
+  }
+
+  void Run() {
+    const int width = canvas()->width();
+    const int height = canvas()->height();
+    float d1 = sqrt(max(width, height))*1.5;
+    float d2 = d1/2.0;
+
+    int dx = rand()%1024;
+    int dy = rand()%1024;
+    while (running()) {
+      for(int y = 0; y < height; y++) {
+        for(int x = 0; x < width; x++) {
+          unsigned int x1 = x + dx;
+          unsigned int y1 = y + dy;
+          float value = sin(x1 / d1);
+          value += sin(y1 / d2);
+          value += sin((x1 + y1) / d1);
+          value += sin(sqrt(x1 * x1 + y1 * y1) / d2);
+          value += 4; // shift range from -4 .. 4 to 0 .. 8
+          value /= 8; // bring range down to 0 .. 1
+
+          // value >= 0 && value =< 1.0
+          float hue = hueShift + value;
+          if (hue >= 1.0) hue -= 1.0;
+          Color c = HsvToRGB(HSVColor(hue*255, 255, 128));
+#ifdef PLASMA_DOUBLE_BUFFER
+          matrix_->transformer()->Transform(off_screen_canvas_)->SetPixel(x, y, c.r, c.g, c.b);
+#else
+          canvas()->SetPixel(x, y, c.r, c.g, c.b);
+#endif
+        }
+      }
+#ifdef PLASMA_DOUBLE_BUFFER
+      off_screen_canvas_ = matrix_->SwapOnVSync(off_screen_canvas_);
+#endif
+      dx = (dx+1)%1024;
+      dy = (dy+1)%1024;
+      hueShift += 0.02; if (hueShift >= 1.0) hueShift -= 1.0;
+      usleep(delay_ms_ * 1000);
+    }
+  }
+
+private:
+  float hueShift;
+  int delay_ms_;
+#ifdef PLASMA_DOUBLE_BUFFER
+  RGBMatrix *const matrix_;
+  FrameCanvas *off_screen_canvas_;
+#endif
+};
+
 static int usage(const char *progname) {
   fprintf(stderr, "usage: %s <options> -D <demo-nr> [optional parameter]\n",
           progname);
@@ -1204,6 +1269,14 @@ int main(int argc, char *argv[]) {
   case 11:
     image_gen = new BrightnessPulseGenerator(matrix);
     break;
+      
+  case 14:
+#ifdef PLASMA_DOUBLE_BUFFER  
+    image_gen = new Plasma(matrix);
+#else 
+    image_gen = new Plasma(canvas, scroll_ms);
+#endif
+      
   }
 
   if (image_gen == NULL)
