@@ -20,6 +20,15 @@ struct Color {
   uint8_t g;
   uint8_t b;
 };
+  
+struct HSVColor {
+  HSVColor(uint8_t h_, uint8_t s_, uint8_t v_) : h(h_), s(s_), v(v_) {}
+  uint8_t h;
+  uint8_t s;
+  uint8_t v;
+};
+  
+Color HsvToRGB(HSVColor hsv);
 
 // Font loading bdf files. If this ever becomes more types, just make virtual
 // base class.
